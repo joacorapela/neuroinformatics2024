@@ -9,10 +9,15 @@ def get_background(cap, frame_indices):
     for i, idx in enumerate(frame_indices):
         cap.set(cv2.CAP_PROP_POS_FRAMES, idx)
         ret, frame = cap.read()
+        # cv2.imshow("", frame)
+        # if cv2.waitKey(0) & 0xFF == ord('q'):
+        #     return
+
         if i == 0:
             frames = np.empty((frame.shape[0], frame.shape[1], frame.shape[2],
                                num_frames), dtype=np.int8)
         frames[:, :, :, i] = frame
+        # breakpoint()
     median_frame = np.median(frames, axis=-1).astype(np.uint8)
     background = cv2.cvtColor(median_frame, cv2.COLOR_BGR2GRAY)
     return background
