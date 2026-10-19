@@ -44,11 +44,21 @@ def update_frame(frame, cx, cy, f_mean, f_cov, ellipse_quantile,
 def main(argv):
     parser = argparse.ArgumentParser()
     parser.add_argument(
+        "--start_time", type=float, help="start time (secs)",
+        default=684.0)
+        # default=0.0)
+    parser.add_argument(
+        "--frames_for_background", type=str,
+        help="frames to use for background extraction",
+        default="[10000, 29000, 35000]")
+        # frame_indices=[10000, 29000, 25000])
+    parser.add_argument(
         "--video_zoom_out_factor", type=float, help="video zoom out factor",
         default=1.0)
     parser.add_argument(
         "--video_filename", type=str, help="video filename",
-        default="../../data/FrameTop_2021-06-03T17-00-00_end001000.avi")
+        default="/ceph/aeon/aeon/data/raw/AEON2/experiment0.2/2022-08-15T14-08-23/CameraTop/CameraTop_2022-08-15T13-00-00.avi")
+        # default="../../data/FrameTop_2021-06-03T17-00-00_end001000.avi")
     parser.add_argument(
         "--pixel_thr_value", type=int,
         help="threshold value for pixels", default=50)
@@ -60,13 +70,16 @@ def main(argv):
         default=2000)
     parser.add_argument(
         "--sigma_a", type=float, help="acceleration standard deviation",
-        default=1e2)
+        default=350.0)
+        # default=1e2)
     parser.add_argument(
         "--sigma_x", type=float, help="x measurement standard deviation",
-        default=1e1)
+        default=0.25)
+        # default=1e1)
     parser.add_argument(
         "--sigma_y", type=float, help="y measurement standard deviation",
-        default=1e1)
+        default=0.25)
+        # default=1e1)
     parser.add_argument(
         "--mu0_x", type=float,
         help="x coordinate of position initial condition", default=100)
@@ -103,6 +116,9 @@ def main(argv):
         default="../../videos/{:s}")
     args = parser.parse_args()
 
+    start_time = args.start_time
+    frames_for_background_str = args.frames_for_background
+
     video_zoom_out_factor = args.video_zoom_out_factor
     video_filename = args.video_filename
     pixel_thr_value = args.pixel_thr_value
@@ -123,6 +139,7 @@ def main(argv):
     max_speed = args.max_speed
     output_video_filename_pattern = args.output_video_filename_pattern
 
+    frames_for_background = list(map(int, frames_for_background_str[1:-1].split(', ')))
     video_filename_proper = os.path.basename(video_filename)
     output_video_filename = output_video_filename_pattern.format(
         video_filename_proper)
@@ -161,9 +178,26 @@ def main(argv):
     # dirty hack to compute the background by taking the median of three
     # frames where the mouse is on different positions
     background = computer_vision.get_background(
-        cap=cap, frame_indices=[10000, 29000, 25000])
+        cap=cap,
+        frame_indices=[10000, 29000, 35000])
+        # frame_indices=[10000, 29000, 25000])
     background = cv2.resize(background, (int(frame_width/video_zoom_out_factor),
                                          int(frame_height/video_zoom_out_factor)))
+    # cv2.imshow("", background)
+    # if cv2.waitKey(0) & 0xFF == ord('q'):
+    #     return
+
+    # breakpoint()
+
+    # seek start frame
+    start_frame = start_time * fps
+    # current_frame = 0
+    # ret = True
+    # while current_frame < start_frame and ret:
+    #     ret, _ = cap.read()
+    #     current_frame += 1
+    cap.set(cv2.CAP_PROP_POS_FRAMES, start_frame-1)
+
     while cap.isOpened():
         # get new video frame
         ret, frame = cap.read()
@@ -190,6 +224,7 @@ def main(argv):
         f_mean_pos_int = f_mean_pos.flatten().astype(int)
         f_cov_pos = np.array([[f_cov[0, 0], f_cov[0, 3]],
                               [f_cov[3, 0], f_cov[3, 3]]], dtype=np.double)
+        print(f_cov_pos)
         filtered_ellipse_color = tuple([int(filtered_color[i]*speed/max_speed)
                                         for i in range(len(filtered_color))])
         frame = update_frame(frame=frame, cx=cx, cy=cy, f_mean=f_mean_pos_int,
@@ -216,7 +251,6 @@ def main(argv):
         writer.write(frame)
 
         cv2.imshow("", frame)
-
         if cv2.waitKey(25) & 0xFF == ord('q'):
             break
 
